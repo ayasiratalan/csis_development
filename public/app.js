@@ -336,20 +336,21 @@
   }
 
   async function loadHealth() {
+    if (hasDirectN8nWebhook()) {
+      state.workflowMode = "direct n8n webhook";
+      modeChip.textContent = "Workflow Mode: Direct n8n webhook";
+      setStatus(
+        "Direct n8n mode is active. Clicking Run Workflow will POST to the webhook in config.js."
+      );
+      return;
+    }
+
     if (state.isFilePreview) {
-      if (hasDirectN8nWebhook()) {
-        state.workflowMode = "direct n8n webhook";
-        modeChip.textContent = "Workflow Mode: Direct n8n webhook";
-        setStatus(
-          "Direct n8n mode is active. Clicking Run Workflow will POST to the webhook in config.js."
-        );
-      } else {
-        state.workflowMode = "file preview";
-        modeChip.textContent = "Workflow Mode: File preview";
-        setStatus(
-          "File preview is active. It does not run n8n. Add a webhook URL in public/config.js or run `node server.js` for live mode."
-        );
-      }
+      state.workflowMode = "file preview";
+      modeChip.textContent = "Workflow Mode: File preview";
+      setStatus(
+        "File preview is active. It does not run n8n. Add a webhook URL in public/config.js or run `node server.js` for live mode."
+      );
       return;
     }
 
@@ -377,7 +378,7 @@
   }
 
   async function runReport() {
-    if (state.isFilePreview && hasDirectN8nWebhook()) {
+    if (hasDirectN8nWebhook()) {
       return runDirectN8nWebhook();
     }
 
