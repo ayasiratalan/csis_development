@@ -1,6 +1,6 @@
 (function () {
   var state = {
-    companyKey: "chevron",
+    companyKey: "adm",
     intervalDays: 14,
     loading: false,
     workflowMode: "unknown",
@@ -10,15 +10,130 @@
   var runtimeConfig = window.CSIS_DASHBOARD_CONFIG || {};
 
   var companyData = {
+    adm: {
+      name: "ADM",
+      domain: "adm.com",
+      secCik: "7084"
+    },
+    bhp: {
+      name: "BHP",
+      domain: "bhp.com",
+      secCik: "811809"
+    },
+    hyundai: {
+      name: "Hyundai",
+      domain: "hyundai.com",
+      secCik: ""
+    },
+    samsung: {
+      name: "Samsung",
+      domain: "samsung.com",
+      secCik: ""
+    },
     chevron: {
       name: "Chevron",
       domain: "chevron.com",
       secCik: "93410"
     },
+    cisco: {
+      name: "Cisco",
+      domain: "cisco.com",
+      secCik: "858877"
+    },
+    merck: {
+      name: "Merck",
+      domain: "merck.com",
+      secCik: "310158"
+    },
+    qualcomm: {
+      name: "Qualcomm",
+      domain: "qualcomm.com",
+      secCik: "804328"
+    },
+    nvidia: {
+      name: "NVIDIA",
+      domain: "nvidia.com",
+      secCik: "1045810"
+    },
+    microsoft: {
+      name: "Microsoft",
+      domain: "microsoft.com",
+      secCik: "789019"
+    },
+    ibm: {
+      name: "IBM",
+      domain: "ibm.com",
+      secCik: "51143"
+    },
     exxon: {
       name: "Exxon",
       domain: "corporate.exxonmobil.com",
       secCik: "34088"
+    },
+    amazon: {
+      name: "Amazon",
+      domain: "amazon.com",
+      secCik: "1018724"
+    },
+    bank_of_america: {
+      name: "Bank of America",
+      domain: "bankofamerica.com",
+      secCik: "70858"
+    },
+    pepsico: {
+      name: "PepsiCo",
+      domain: "pepsico.com",
+      secCik: "77476"
+    },
+    infineon: {
+      name: "Infineon",
+      domain: "infineon.com",
+      secCik: ""
+    },
+    gilead: {
+      name: "Gilead",
+      domain: "gilead.com",
+      secCik: "882095"
+    },
+    aramco: {
+      name: "Aramco",
+      domain: "aramco.com",
+      secCik: ""
+    },
+    equinor: {
+      name: "Equinor",
+      domain: "equinor.com",
+      secCik: "1140625"
+    },
+    sk_americas: {
+      name: "SK Americas",
+      domain: "sk.com",
+      secCik: ""
+    },
+    jp_morgan: {
+      name: "JP Morgan",
+      domain: "jpmorganchase.com",
+      secCik: "19617"
+    },
+    boeing: {
+      name: "Boeing",
+      domain: "boeing.com",
+      secCik: "12927"
+    },
+    general_atomics: {
+      name: "General Atomics",
+      domain: "ga.com",
+      secCik: ""
+    },
+    mitsubishi: {
+      name: "Mitsubishi",
+      domain: "mitsubishi.com",
+      secCik: ""
+    },
+    sumitomo: {
+      name: "Sumitomo",
+      domain: "sumitomo.com",
+      secCik: ""
     }
   };
 
@@ -48,6 +163,20 @@
     Array.prototype.forEach.call(container.querySelectorAll(".pill"), function (button) {
       var isActive = button.getAttribute(attributeName) === String(value);
       button.classList.toggle("active", isActive);
+    });
+  }
+
+  function renderCompanyOptions() {
+    companyOptions.innerHTML = "";
+    Object.keys(companyData).forEach(function (companyKey) {
+      var button = document.createElement("button");
+      button.className = "pill";
+      button.setAttribute("data-company", companyKey);
+      button.textContent = companyData[companyKey].name;
+      if (companyKey === state.companyKey) {
+        button.classList.add("active");
+      }
+      companyOptions.appendChild(button);
     });
   }
 
@@ -82,10 +211,13 @@
     }
 
     return [
-      "Exxon shows a " +
+      company.name +
+        " shows a " +
         intervalDays +
         "-day pattern of investor communication, regulatory watchpoints, and public positioning around production, technology investment, and long-cycle returns.",
-      "The strongest CSIS outreach angle is to connect ExxonMobil's current positioning with industrial strategy, energy security, and the geopolitical consequences of supply realignment.",
+      "The strongest CSIS outreach angle is to connect " +
+        company.name +
+        "'s current positioning with industrial strategy, supply-chain resilience, technology competition, energy security, and the geopolitical consequences of market realignment.",
       "A one-page memo should surface the most material developments, explain which policy or market pressures are shaping them, and translate that into why CSIS expertise matters now.",
       "Recommended next step: frame outreach around a focused discussion with CSIS experts on strategic energy competition, federal policy pathways, and downstream implications for corporate planning."
     ].join("\n\n");
@@ -108,6 +240,17 @@
         ["Major press coverage of ExxonMobil operations", "https://www.wsj.com/", "wsj.com", "news", 9]
       ]
     };
+
+    if (!sourceSets[companyKey]) {
+      var company = companyData[companyKey];
+      sourceSets[companyKey] = [
+        [company.name + " official update", "https://" + company.domain, company.domain, "official", 6],
+        [company.name + " SEC company filings", "https://www.sec.gov/", "sec.gov", "official", 10],
+        [company.name + " policy and government signal", "https://www.federalregister.gov/", "federalregister.gov", "government", 13],
+        [company.name + " strategic policy analysis", "https://www.csis.org/", "csis.org", "thinktank", 16],
+        [company.name + " market and geopolitical coverage", "https://www.reuters.com/", "reuters.com", "news", 8]
+      ];
+    }
 
     return sourceSets[companyKey].map(function (source, index) {
       return {
@@ -459,6 +602,8 @@
       setLoading(false);
     }
   });
+
+  renderCompanyOptions();
 
   loadHealth().then(function () {
     var search = new URLSearchParams(window.location.search);

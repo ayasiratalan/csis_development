@@ -144,6 +144,8 @@ html {
 .control-panel {
   padding: 24px;
   height: fit-content;
+  max-height: calc(100vh - 48px);
+  overflow: auto;
   position: sticky;
   top: 24px;
 }
