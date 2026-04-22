@@ -36,7 +36,7 @@
     },
     {
       "parameters": {
-        "functionCode": "const incoming = items[0].json || {};\nconst source = incoming.body && typeof incoming.body === 'object' ? incoming.body : incoming;\nconst item = {\n  ...source,\n  requested_at: source.requested_at || incoming.headers?.['x-requested-at'] || new Date().toISOString(),\n  status: source.status || 'pending'\n};\nconst company = (item.company_name || '').toString().trim();\nif (!company) {\n  throw new Error('company_name is required in the intake sheet.');\n}\nconst profileKey = company.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();\nconst companyProfiles = {\n  mitsubishi: { domain: 'mhi.com', aliases: ['Mitsubishi Heavy Industries', 'MHI'], official_domains: ['mhi.com'] },\n  'sk americas': { domain: 'sk.com', aliases: ['SK Group', 'SK hynix', 'SK Innovation'], official_domains: ['sk.com'] },\n  hyundai: { domain: 'hyundai.com', aliases: ['Hyundai Motor', 'Hyundai Motor Company'], official_domains: ['hyundai.com', 'hyundai.news'] },\n  samsung: { domain: 'samsung.com', aliases: ['Samsung Electronics'], official_domains: ['samsung.com', 'news.samsung.com'] },\n  aramco: { domain: 'aramco.com', aliases: ['Saudi Aramco'], official_domains: ['aramco.com'] },\n  'jp morgan': { domain: 'jpmorganchase.com', aliases: ['JPMorgan Chase', 'J.P. Morgan'], official_domains: ['jpmorganchase.com'] }\n};\nconst profile = companyProfiles[profileKey] || {};\nconst rawAliases = Array.isArray(item.company_aliases)\n  ? item.company_aliases\n  : (item.company_aliases || '').toString().split(/[;,]/);\nconst companyAliases = [...new Set([...(profile.aliases || []), ...rawAliases]\n  .map(a => (a || '').toString().trim())\n  .filter(Boolean))];\nconst companyNames = [company, ...companyAliases];\nconst quotedCompanyNames = companyNames.map(name => `\"${name}\"`).join(' OR ');\nconst days = Number(item.time_period_days || item.time_period || item.days || 14);\nconst allowed = [14, 30, 60];\nconst normalizedDays = allowed.includes(days) ? days : 14;\nconst now = new Date();\nconst end = now.toISOString().slice(0, 10);\nconst startDateObj = new Date(now);\nstartDateObj.setUTCDate(startDateObj.getUTCDate() - normalizedDays);\nconst start = startDateObj.toISOString().slice(0, 10);\nconst slug = company\n  .toLowerCase()\n  .replace(/[^a-z0-9]+/g, '_')\n  .replace(/^_+|_+$/g, '')\n  .slice(0, 60) || 'company';\nconst runId = `${slug}_${end}_${normalizedDays}d_${item.row_number || 0}`;\nconst secCik = (item.sec_cik || '').toString().replace(/\\D/g, '');\nconst paddedCik = secCik ? secCik.padStart(10, '0') : '';\nconst shortCik = secCik ? secCik.replace(/^0+/, '') : '';\nconst rawDomain = (item.company_domain || item.official_domain || profile.domain || '').toString().trim().toLowerCase();\nconst companyDomain = rawDomain\n  .replace(/^https?:\\/\\//, '')\n  .replace(/^www\\./, '')\n  .replace(/\\/.*$/, '');\nconst officialDomains = [...(profile.official_domains || []), 'sec.gov', 'businesswire.com', 'prnewswire.com', 'globenewswire.com'];\nif (companyDomain) {\n  officialDomains.unshift(companyDomain);\n  officialDomains.unshift(`investor.${companyDomain}`);\n  officialDomains.unshift(`ir.${companyDomain}`);\n  officialDomains.unshift(`investors.${companyDomain}`);\n}\nconst dedup = (arr) => [...new Set(arr.filter(Boolean))];\nconst officialDomainsFinal = dedup(officialDomains);\nconst governmentDomains = ['lda.senate.gov', 'opensecrets.org', 'usaspending.gov', 'sam.gov', 'federalregister.gov'];\nconst thinktankDomains = ['csis.org', 'brookings.edu', 'rand.org', 'cfr.org', 'cnas.org', 'carnegieendowment.org', 'aei.org'];\nconst officialQuery = paddedCik\n  ? `(${quotedCompanyNames}) ${shortCik} (\"8-K\" OR \"10-Q\" OR \"10-K\" OR \"earnings release\" OR \"investor relations\" OR \"press release\" OR \"news release\" OR contract OR award)`\n  : `(${quotedCompanyNames}) (\"8-K\" OR \"10-Q\" OR \"10-K\" OR \"earnings release\" OR \"investor relations\" OR \"press release\" OR \"news release\" OR contract OR award)`;\nconst governmentQuery = `(${quotedCompanyNames}) (\"LD-2\" OR lobbying OR procurement OR \"Senate lobbying\" OR \"Federal Register\")`;\nconst thinktankQuery = `(${quotedCompanyNames}) (regulation OR policy OR analysis OR briefing OR strategic risk)`;\nconst newsQuery = `(${quotedCompanyNames}) (earnings OR acquisition OR divestiture OR lawsuit OR regulation OR contract OR partnership OR investment OR launch OR order OR award OR \"press release\" OR \"news release\")`;\nreturn [{\n  json: {\n    ...item,\n    company_name: company,\n    sec_cik: paddedCik,\n    sec_cik_short: shortCik,\n    company_domain: companyDomain,\n    company_aliases: companyAliases,\n    company_names: companyNames,\n    time_period_days: normalizedDays,\n    time_period_label: item.time_period_label || `${normalizedDays} days`,\n    start_date: start,\n    end_date: end,\n    safe_file_name: slug,\n    run_id: runId,\n    official_domains: officialDomainsFinal,\n    government_domains: governmentDomains,\n    thinktank_domains: thinktankDomains,\n    official_query: officialQuery,\n    government_query: governmentQuery,\n    thinktank_query: thinktankQuery,\n    news_query: newsQuery,\n    scraped_at: new Date().toISOString()\n  }\n}];"
+        "functionCode": "const incoming = items[0].json || {};\nconst source = incoming.body && typeof incoming.body === 'object' ? incoming.body : incoming;\nconst item = {\n  ...source,\n  requested_at: source.requested_at || incoming.headers?.['x-requested-at'] || new Date().toISOString(),\n  status: source.status || 'pending'\n};\nconst company = (item.company_name || '').toString().trim();\nif (!company) {\n  throw new Error('company_name is required in the intake sheet.');\n}\nconst profileKey = company.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();\nconst globalNewsDomains = [\n  'reuters.com', 'apnews.com', 'bloomberg.com', 'ft.com', 'wsj.com', 'cnbc.com',\n  'marketwatch.com', 'barrons.com', 'forbes.com', 'fortune.com', 'axios.com',\n  'politico.com', 'thehill.com', 'semafor.com', 'nikkei.com', 'asia.nikkei.com',\n  'economist.com', 'finance.yahoo.com', 'prnewswire.com', 'businesswire.com', 'globenewswire.com'\n];\nconst companyProfiles = {\n  adm: { domain: 'adm.com', aliases: ['Archer Daniels Midland'], official_domains: ['adm.com'], news_domains: globalNewsDomains },\n  bhp: { domain: 'bhp.com', aliases: ['BHP Group'], official_domains: ['bhp.com'], news_domains: globalNewsDomains },\n  hyundai: { domain: 'hyundai.com', aliases: ['Hyundai Motor', 'Hyundai Motor Company', 'Hyundai Motor Group'], official_domains: ['hyundai.com', 'hyundai.news', 'hyundaimotorgroup.com'], news_domains: globalNewsDomains },\n  samsung: { domain: 'samsung.com', aliases: ['Samsung Electronics', 'Samsung Group'], official_domains: ['samsung.com', 'news.samsung.com'], news_domains: globalNewsDomains },\n  chevron: { domain: 'chevron.com', aliases: ['Chevron Corporation'], official_domains: ['chevron.com'], news_domains: globalNewsDomains },\n  cisco: { domain: 'cisco.com', aliases: ['Cisco Systems'], official_domains: ['cisco.com', 'newsroom.cisco.com'], news_domains: globalNewsDomains },\n  merck: { domain: 'merck.com', aliases: ['Merck & Co.', 'MSD'], official_domains: ['merck.com'], news_domains: globalNewsDomains },\n  qualcomm: { domain: 'qualcomm.com', aliases: ['Qualcomm Incorporated'], official_domains: ['qualcomm.com'], news_domains: globalNewsDomains },\n  nvidia: { domain: 'nvidia.com', aliases: ['NVIDIA Corporation'], official_domains: ['nvidia.com', 'nvidianews.nvidia.com'], news_domains: globalNewsDomains },\n  microsoft: { domain: 'microsoft.com', aliases: ['Microsoft Corporation'], official_domains: ['microsoft.com', 'news.microsoft.com'], news_domains: globalNewsDomains },\n  ibm: { domain: 'ibm.com', aliases: ['International Business Machines'], official_domains: ['ibm.com', 'newsroom.ibm.com'], news_domains: globalNewsDomains },\n  exxon: { domain: 'corporate.exxonmobil.com', aliases: ['ExxonMobil', 'Exxon Mobil', 'Exxon Mobil Corporation'], official_domains: ['corporate.exxonmobil.com', 'exxonmobil.com'], news_domains: globalNewsDomains },\n  amazon: { domain: 'amazon.com', aliases: ['Amazon.com', 'Amazon Web Services', 'AWS'], official_domains: ['amazon.com', 'aboutamazon.com', 'aws.amazon.com'], news_domains: globalNewsDomains },\n  'bank of america': { domain: 'bankofamerica.com', aliases: ['BofA', 'Bank of America Corporation'], official_domains: ['bankofamerica.com', 'newsroom.bankofamerica.com'], news_domains: globalNewsDomains },\n  pepsico: { domain: 'pepsico.com', aliases: ['PepsiCo Inc.', 'Pepsi'], official_domains: ['pepsico.com'], news_domains: globalNewsDomains },\n  infineon: { domain: 'infineon.com', aliases: ['Infineon Technologies'], official_domains: ['infineon.com'], news_domains: globalNewsDomains },\n  gilead: { domain: 'gilead.com', aliases: ['Gilead Sciences'], official_domains: ['gilead.com'], news_domains: globalNewsDomains },\n  aramco: { domain: 'aramco.com', aliases: ['Saudi Aramco'], official_domains: ['aramco.com'], news_domains: globalNewsDomains },\n  equinor: { domain: 'equinor.com', aliases: ['Equinor ASA'], official_domains: ['equinor.com'], news_domains: globalNewsDomains },\n  'sk americas': { domain: 'sk.com', aliases: ['SK Group', 'SK hynix', 'SK Innovation'], official_domains: ['sk.com', 'skhynix.com', 'skinnonews.com'], news_domains: globalNewsDomains },\n  'jp morgan': { domain: 'jpmorganchase.com', aliases: ['JPMorgan Chase', 'J.P. Morgan', 'JPMorgan'], official_domains: ['jpmorganchase.com'], news_domains: globalNewsDomains },\n  boeing: { domain: 'boeing.com', aliases: ['The Boeing Company'], official_domains: ['boeing.com'], news_domains: globalNewsDomains },\n  'general atomics': { domain: 'ga.com', aliases: ['General Atomics Aeronautical Systems', 'GA-ASI'], official_domains: ['ga.com', 'ga-asi.com'], news_domains: globalNewsDomains },\n  mitsubishi: { domain: 'mhi.com', aliases: ['Mitsubishi Heavy Industries', 'MHI', 'Mitsubishi Corporation'], official_domains: ['mhi.com', 'mitsubishicorp.com'], news_domains: globalNewsDomains },\n  sumitomo: { domain: 'sumitomo.com', aliases: ['Sumitomo Corporation'], official_domains: ['sumitomocorp.com', 'sumitomo.com'], news_domains: globalNewsDomains }\n};\nconst profile = companyProfiles[profileKey] || {};\nconst rawAliases = Array.isArray(item.company_aliases)\n  ? item.company_aliases\n  : (item.company_aliases || '').toString().split(/[;,]/);\nconst companyAliases = [...new Set([...(profile.aliases || []), ...rawAliases]\n  .map(a => (a || '').toString().trim())\n  .filter(Boolean))];\nconst companyNames = [company, ...companyAliases];\nconst quotedCompanyNames = companyNames.map(name => `\"${name}\"`).join(' OR ');\nconst dedup = (arr) => [...new Set(arr.filter(Boolean))];\nconst days = Number(item.time_period_days || item.time_period || item.days || 14);\nconst allowed = [14, 30, 60];\nconst normalizedDays = allowed.includes(days) ? days : 14;\nconst now = new Date();\nconst end = now.toISOString().slice(0, 10);\nconst startDateObj = new Date(now);\nstartDateObj.setUTCDate(startDateObj.getUTCDate() - normalizedDays);\nconst start = startDateObj.toISOString().slice(0, 10);\nconst slug = company\n  .toLowerCase()\n  .replace(/[^a-z0-9]+/g, '_')\n  .replace(/^_+|_+$/g, '')\n  .slice(0, 60) || 'company';\nconst runId = `${slug}_${end}_${normalizedDays}d_${item.row_number || 0}`;\nconst secCik = (item.sec_cik || '').toString().replace(/\\D/g, '');\nconst paddedCik = secCik ? secCik.padStart(10, '0') : '';\nconst shortCik = secCik ? secCik.replace(/^0+/, '') : '';\nconst rawDomain = (item.company_domain || item.official_domain || profile.domain || '').toString().trim().toLowerCase();\nconst companyDomain = rawDomain\n  .replace(/^https?:\\/\\//, '')\n  .replace(/^www\\./, '')\n  .replace(/\\/.*$/, '');\nconst officialDomains = [...(profile.official_domains || []), 'sec.gov', 'businesswire.com', 'prnewswire.com', 'globenewswire.com'];\nif (companyDomain) {\n  officialDomains.unshift(companyDomain);\n  officialDomains.unshift(`investor.${companyDomain}`);\n  officialDomains.unshift(`ir.${companyDomain}`);\n  officialDomains.unshift(`investors.${companyDomain}`);\n}\nconst officialDomainsFinal = dedup(officialDomains);\nconst governmentDomains = ['lda.senate.gov', 'opensecrets.org', 'usaspending.gov', 'sam.gov', 'federalregister.gov'];\nconst thinktankDomains = ['csis.org', 'brookings.edu', 'rand.org', 'cfr.org', 'cnas.org', 'carnegieendowment.org', 'aei.org'];\nconst officialQuery = paddedCik\n  ? `(${quotedCompanyNames}) ${shortCik} (\"8-K\" OR \"10-Q\" OR \"10-K\" OR \"earnings release\" OR \"investor relations\" OR \"press release\" OR \"news release\" OR contract OR award)`\n  : `(${quotedCompanyNames}) (\"8-K\" OR \"10-Q\" OR \"10-K\" OR \"earnings release\" OR \"investor relations\" OR \"press release\" OR \"news release\" OR contract OR award)`;\nconst governmentQuery = `(${quotedCompanyNames}) (\"LD-2\" OR lobbying OR procurement OR \"Senate lobbying\" OR \"Federal Register\")`;\nconst thinktankQuery = `(${quotedCompanyNames}) (regulation OR policy OR analysis OR briefing OR strategic risk)`;\nconst announcementQuery = `(${quotedCompanyNames}) (announcement OR \"press release\" OR \"news release\" OR contract OR award OR order OR partnership OR investment OR launch OR acquisition OR divestiture OR lawsuit OR earnings)`;\nconst targetedNewsQuery = `(${quotedCompanyNames}) (earnings OR acquisition OR divestiture OR lawsuit OR regulation OR contract OR partnership OR investment OR launch OR order OR award OR \"press release\" OR \"news release\" OR geopolitical OR supply chain OR policy)`;\nconst newsQuery = `(${quotedCompanyNames}) (earnings OR acquisition OR divestiture OR lawsuit OR regulation OR contract OR partnership OR investment OR launch OR order OR award OR geopolitical OR supply chain OR policy)`;\nconst newsDomains = dedup([...(profile.news_domains || globalNewsDomains)]);\nreturn [{\n  json: {\n    ...item,\n    company_name: company,\n    sec_cik: paddedCik,\n    sec_cik_short: shortCik,\n    company_domain: companyDomain,\n    company_aliases: companyAliases,\n    company_names: companyNames,\n    time_period_days: normalizedDays,\n    time_period_label: item.time_period_label || `${normalizedDays} days`,\n    start_date: start,\n    end_date: end,\n    safe_file_name: slug,\n    run_id: runId,\n    official_domains: officialDomainsFinal,\n    government_domains: governmentDomains,\n    thinktank_domains: thinktankDomains,\n    news_domains: newsDomains,\n    official_query: officialQuery,\n    government_query: governmentQuery,\n    thinktank_query: thinktankQuery,\n    announcement_query: announcementQuery,\n    targeted_news_query: targetedNewsQuery,\n    news_query: newsQuery,\n    scraped_at: new Date().toISOString()\n  }\n}];"
       },
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
@@ -133,17 +133,17 @@
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({\n  query: $('Normalize Inputs').item.json.news_query,\n  topic: 'news',\n  search_depth: 'advanced',\n  max_results: 10,\n  start_date: $('Normalize Inputs').item.json.start_date,\n  end_date: $('Normalize Inputs').item.json.end_date,\n  include_raw_content: true,\n  include_answer: false\n}) }}",
+        "jsonBody": "={{ JSON.stringify({\n  query: $('Normalize Inputs').item.json.news_query,\n  topic: 'news',\n  search_depth: 'advanced',\n  include_raw_content: true,\n  max_results: 18,\n  start_date: $('Normalize Inputs').item.json.start_date,\n  end_date: $('Normalize Inputs').item.json.end_date,\n  include_answer: false\n}) }}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
         -32,
-        1088
+        1264
       ],
       "id": "151e6bb4-4421-4a44-b207-aeaf191f38db",
-      "name": "Search News Sources",
+      "name": "Search Broad News Sources",
       "credentials": {
         "httpHeaderAuth": {
           "id": "wasPaWy7tmUk5k0C",
@@ -206,10 +206,10 @@
       "typeVersion": 3.2,
       "position": [
         208,
-        1088
+        1264
       ],
       "id": "7d8daa17-4726-4639-bb7e-2c2d4ee924d8",
-      "name": "Merge News Meta + Results"
+      "name": "Merge Broad News Meta + Results"
     },
     {
       "parameters": {
@@ -258,10 +258,10 @@
       "typeVersion": 1,
       "position": [
         448,
-        1088
+        1264
       ],
       "id": "ae23d896-5728-48e3-91cd-570b09669ca4",
-      "name": "Flatten News Results"
+      "name": "Flatten Broad News Results"
     },
     {
       "parameters": {},
@@ -1085,6 +1085,136 @@
       ],
       "id": "respond-dashboard",
       "name": "Respond to Dashboard"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  query: $('Normalize Inputs').item.json.announcement_query,\n  topic: 'general',\n  search_depth: 'advanced',\n  include_domains: $('Normalize Inputs').item.json.official_domains,\n  include_raw_content: true,\n  max_results: 14,\n  start_date: $('Normalize Inputs').item.json.start_date,\n  end_date: $('Normalize Inputs').item.json.end_date,\n  include_answer: false\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -32,
+        1024
+      ],
+      "id": "search-company-announcements",
+      "name": "Search Company Website Announcements",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wasPaWy7tmUk5k0C",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        208,
+        1024
+      ],
+      "id": "merge-company-announcements",
+      "name": "Merge Company Announcement Meta + Results"
+    },
+    {
+      "parameters": {
+        "functionCode": "\nconst sourceClass = 'official';\nconst queryField = 'announcement_query';\nconst item = items[0].json;\nconst results = Array.isArray(item.results) ? item.results : [];\nconst extractDomain = (url = '') => {\n  try { return new URL(url).hostname.replace(/^www\\./, ''); } catch (e) { return ''; }\n};\nconst docs = results.map((doc, idx) => {\n  const body = (doc.raw_content || doc.content || '').toString();\n  return {\n    json: {\n      run_id: item.run_id,\n      row_number: item.row_number,\n      company_name: item.company_name,\n      sec_cik: item.sec_cik || '',\n      company_domain: item.company_domain || '',\n      time_period_days: item.time_period_days,\n      time_period_label: item.time_period_label,\n      start_date: item.start_date,\n      end_date: item.end_date,\n      source_class: sourceClass,\n      source_domain: extractDomain(doc.url || ''),\n      title: (doc.title || '').toString().slice(0, 500),\n      url: doc.url || '',\n      published_date: doc.published_date || doc.published || '',\n      scraped_at: item.scraped_at,\n      query_used: item[queryField],\n      snippet: (doc.content || '').toString().slice(0, 2000),\n      content_excerpt: body.slice(0, 10000),\n      content_length: body.length,\n      source_rank: idx + 1,\n      duplicate_flag: false,\n      placeholder: false\n    }\n  };\n});\nif (docs.length === 0) {\n  return [{\n    json: {\n      run_id: item.run_id,\n      row_number: item.row_number,\n      company_name: item.company_name,\n      sec_cik: item.sec_cik || '',\n      company_domain: item.company_domain || '',\n      time_period_days: item.time_period_days,\n      time_period_label: item.time_period_label,\n      start_date: item.start_date,\n      end_date: item.end_date,\n      source_class: sourceClass,\n      source_domain: '',\n      title: '',\n      url: '',\n      published_date: '',\n      scraped_at: item.scraped_at,\n      query_used: item[queryField],\n      snippet: '',\n      content_excerpt: '',\n      content_length: 0,\n      source_rank: 0,\n      duplicate_flag: false,\n      placeholder: true\n    }\n  }];\n}\nreturn docs;\n"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        448,
+        1024
+      ],
+      "id": "flatten-company-announcements",
+      "name": "Flatten Company Announcement Results"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  query: $('Normalize Inputs').item.json.targeted_news_query,\n  topic: 'news',\n  search_depth: 'advanced',\n  include_domains: $('Normalize Inputs').item.json.news_domains,\n  include_raw_content: true,\n  max_results: 16,\n  start_date: $('Normalize Inputs').item.json.start_date,\n  end_date: $('Normalize Inputs').item.json.end_date,\n  include_answer: false\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -32,
+        1144
+      ],
+      "id": "search-targeted-news-sites",
+      "name": "Search Curated News Sites",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wasPaWy7tmUk5k0C",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        208,
+        1144
+      ],
+      "id": "merge-targeted-news-sites",
+      "name": "Merge Curated News Meta + Results"
+    },
+    {
+      "parameters": {
+        "functionCode": "\nconst sourceClass = 'news';\nconst queryField = 'targeted_news_query';\nconst item = items[0].json;\nconst results = Array.isArray(item.results) ? item.results : [];\nconst extractDomain = (url = '') => {\n  try { return new URL(url).hostname.replace(/^www\\./, ''); } catch (e) { return ''; }\n};\nconst docs = results.map((doc, idx) => {\n  const body = (doc.raw_content || doc.content || '').toString();\n  return {\n    json: {\n      run_id: item.run_id,\n      row_number: item.row_number,\n      company_name: item.company_name,\n      sec_cik: item.sec_cik || '',\n      company_domain: item.company_domain || '',\n      time_period_days: item.time_period_days,\n      time_period_label: item.time_period_label,\n      start_date: item.start_date,\n      end_date: item.end_date,\n      source_class: sourceClass,\n      source_domain: extractDomain(doc.url || ''),\n      title: (doc.title || '').toString().slice(0, 500),\n      url: doc.url || '',\n      published_date: doc.published_date || doc.published || '',\n      scraped_at: item.scraped_at,\n      query_used: item[queryField],\n      snippet: (doc.content || '').toString().slice(0, 2000),\n      content_excerpt: body.slice(0, 10000),\n      content_length: body.length,\n      source_rank: idx + 1,\n      duplicate_flag: false,\n      placeholder: false\n    }\n  };\n});\nif (docs.length === 0) {\n  return [{\n    json: {\n      run_id: item.run_id,\n      row_number: item.row_number,\n      company_name: item.company_name,\n      sec_cik: item.sec_cik || '',\n      company_domain: item.company_domain || '',\n      time_period_days: item.time_period_days,\n      time_period_label: item.time_period_label,\n      start_date: item.start_date,\n      end_date: item.end_date,\n      source_class: sourceClass,\n      source_domain: '',\n      title: '',\n      url: '',\n      published_date: '',\n      scraped_at: item.scraped_at,\n      query_used: item[queryField],\n      snippet: '',\n      content_excerpt: '',\n      content_length: 0,\n      source_rank: 0,\n      duplicate_flag: false,\n      placeholder: true\n    }\n  }];\n}\nreturn docs;\n"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        448,
+        1144
+      ],
+      "id": "flatten-targeted-news-sites",
+      "name": "Flatten Curated News Results"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        704,
+        1192
+      ],
+      "id": "append-broad-and-curated-news",
+      "name": "Append Broad + Curated News"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        832,
+        1112
+      ],
+      "id": "append-news-and-announcements",
+      "name": "Append News + Announcements"
     }
   ],
   "pinData": {},
@@ -1123,12 +1253,32 @@
             "index": 0
           },
           {
-            "node": "Search News Sources",
+            "node": "Search Company Website Announcements",
             "type": "main",
             "index": 0
           },
           {
-            "node": "Merge News Meta + Results",
+            "node": "Merge Company Announcement Meta + Results",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Search Curated News Sites",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Curated News Meta + Results",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Search Broad News Sources",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Broad News Meta + Results",
             "type": "main",
             "index": 0
           },
@@ -1178,17 +1328,6 @@
         ]
       ]
     },
-    "Search News Sources": {
-      "main": [
-        [
-          {
-            "node": "Merge News Meta + Results",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
     "Merge Official Meta + Results": {
       "main": [
         [
@@ -1216,17 +1355,6 @@
         [
           {
             "node": "Flatten Think Tank Results",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge News Meta + Results": {
-      "main": [
-        [
-          {
-            "node": "Flatten News Results",
             "type": "main",
             "index": 0
           }
@@ -1284,17 +1412,6 @@
             "node": "Append + News",
             "type": "main",
             "index": 0
-          }
-        ]
-      ]
-    },
-    "Flatten News Results": {
-      "main": [
-        [
-          {
-            "node": "Append + News",
-            "type": "main",
-            "index": 1
           }
         ]
       ]
@@ -1561,6 +1678,127 @@
             "node": "Normalize Inputs",
             "type": "main",
             "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Company Website Announcements": {
+      "main": [
+        [
+          {
+            "node": "Merge Company Announcement Meta + Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Company Announcement Meta + Results": {
+      "main": [
+        [
+          {
+            "node": "Flatten Company Announcement Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Curated News Sites": {
+      "main": [
+        [
+          {
+            "node": "Merge Curated News Meta + Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Curated News Meta + Results": {
+      "main": [
+        [
+          {
+            "node": "Flatten Curated News Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Broad News Sources": {
+      "main": [
+        [
+          {
+            "node": "Merge Broad News Meta + Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Broad News Meta + Results": {
+      "main": [
+        [
+          {
+            "node": "Flatten Broad News Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Broad News Results": {
+      "main": [
+        [
+          {
+            "node": "Append Broad + Curated News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Curated News Results": {
+      "main": [
+        [
+          {
+            "node": "Append Broad + Curated News",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Append Broad + Curated News": {
+      "main": [
+        [
+          {
+            "node": "Append News + Announcements",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Company Announcement Results": {
+      "main": [
+        [
+          {
+            "node": "Append News + Announcements",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Append News + Announcements": {
+      "main": [
+        [
+          {
+            "node": "Append + News",
+            "type": "main",
+            "index": 1
           }
         ]
       ]

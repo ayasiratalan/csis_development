@@ -113,3 +113,34 @@ If it still says `File preview`, no n8n webhook URL is configured.
 - `excel_file_name`
 
 If you keep the current Google Sheets append step, that is fine, but the dashboard still needs the JSON response above so it can render results immediately.
+
+## News Discovery Architecture
+
+The latest webhook workflow no longer relies on one broad news query. `Normalize Inputs` now creates:
+
+- `company_names`: the submitted company plus aliases such as `Mitsubishi Heavy Industries` and `MHI`
+- `official_domains`: company websites, press rooms, investor sites, wire services, and SEC where relevant
+- `news_domains`: curated media and wire-service domains
+- `announcement_query`: for company website announcements and press releases
+- `targeted_news_query`: for curated news-domain searches
+- `news_query`: for broad news search
+
+The discovery branches are:
+
+- `Search Company Website Announcements`: searches official company domains and announcement sites.
+- `Search Curated News Sites`: searches a fixed set of major news/wire sources.
+- `Search Broad News Sources`: searches broader Tavily news results without domain restriction.
+
+Those branches flow through:
+
+```text
+Flatten Broad News Results
+Flatten Curated News Results
+Flatten Company Announcement Results
+-> Append Broad + Curated News
+-> Append News + Announcements
+-> Append + News
+-> Validate Dates and Company Match
+```
+
+This means company website announcements, wire-service items, and broader news are all deduplicated and validated together before the LLM memo stage.
