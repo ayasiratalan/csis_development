@@ -125,6 +125,53 @@ updateNode("Normalize Inputs", (node) => {
       "};"
     ].join("\n")
   );
+  node.parameters.functionCode = node.parameters.functionCode.replace(
+    "const days = Number(item.time_period_days || item.time_period || item.days || 14);",
+    [
+      "const profileKey = company.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();",
+      "const companyProfiles = {",
+      "  mitsubishi: { domain: 'mhi.com', aliases: ['Mitsubishi Heavy Industries', 'MHI'], official_domains: ['mhi.com'] },",
+      "  'sk americas': { domain: 'sk.com', aliases: ['SK Group', 'SK hynix', 'SK Innovation'], official_domains: ['sk.com'] },",
+      "  hyundai: { domain: 'hyundai.com', aliases: ['Hyundai Motor', 'Hyundai Motor Company'], official_domains: ['hyundai.com', 'hyundai.news'] },",
+      "  samsung: { domain: 'samsung.com', aliases: ['Samsung Electronics'], official_domains: ['samsung.com', 'news.samsung.com'] },",
+      "  aramco: { domain: 'aramco.com', aliases: ['Saudi Aramco'], official_domains: ['aramco.com'] },",
+      "  'jp morgan': { domain: 'jpmorganchase.com', aliases: ['JPMorgan Chase', 'J.P. Morgan'], official_domains: ['jpmorganchase.com'] }",
+      "};",
+      "const profile = companyProfiles[profileKey] || {};",
+      "const rawAliases = Array.isArray(item.company_aliases)",
+      "  ? item.company_aliases",
+      "  : (item.company_aliases || '').toString().split(/[;,]/);",
+      "const companyAliases = [...new Set([...(profile.aliases || []), ...rawAliases]",
+      "  .map(a => (a || '').toString().trim())",
+      "  .filter(Boolean))];",
+      "const companyNames = [company, ...companyAliases];",
+      "const quotedCompanyNames = companyNames.map(name => `\"${name}\"`).join(' OR ');",
+      "const days = Number(item.time_period_days || item.time_period || item.days || 14);"
+    ].join("\n")
+  );
+  node.parameters.functionCode = node.parameters.functionCode.replace(
+    "const rawDomain = (item.company_domain || item.official_domain || '').toString().trim().toLowerCase();",
+    "const rawDomain = (item.company_domain || item.official_domain || profile.domain || '').toString().trim().toLowerCase();"
+  );
+  node.parameters.functionCode = node.parameters.functionCode.replace(
+    "const officialDomains = ['sec.gov', 'businesswire.com', 'prnewswire.com', 'globenewswire.com'];",
+    "const officialDomains = [...(profile.official_domains || []), 'sec.gov', 'businesswire.com', 'prnewswire.com', 'globenewswire.com'];"
+  );
+  node.parameters.functionCode = node.parameters.functionCode.replace(
+    "const officialQuery = paddedCik\n  ? `\"${company}\" ${shortCik} (\"8-K\" OR \"10-Q\" OR \"10-K\" OR \"earnings release\" OR \"investor relations\" OR \"press release\")`\n  : `\"${company}\" (\"8-K\" OR \"10-Q\" OR \"10-K\" OR \"earnings release\" OR \"investor relations\" OR \"press release\")`;\nconst governmentQuery = `\"${company}\" (\"LD-2\" OR lobbying OR procurement OR \"Senate lobbying\" OR \"Federal Register\")`;\nconst thinktankQuery = `\"${company}\" (regulation OR policy OR analysis OR briefing OR strategic risk)`;\nconst newsQuery = `\"${company}\" (earnings OR acquisition OR divestiture OR lawsuit OR regulation OR contract)`;",
+    [
+      "const officialQuery = paddedCik",
+      "  ? `(${quotedCompanyNames}) ${shortCik} (\"8-K\" OR \"10-Q\" OR \"10-K\" OR \"earnings release\" OR \"investor relations\" OR \"press release\" OR \"news release\" OR contract OR award)`",
+      "  : `(${quotedCompanyNames}) (\"8-K\" OR \"10-Q\" OR \"10-K\" OR \"earnings release\" OR \"investor relations\" OR \"press release\" OR \"news release\" OR contract OR award)`;",
+      "const governmentQuery = `(${quotedCompanyNames}) (\"LD-2\" OR lobbying OR procurement OR \"Senate lobbying\" OR \"Federal Register\")`;",
+      "const thinktankQuery = `(${quotedCompanyNames}) (regulation OR policy OR analysis OR briefing OR strategic risk)`;",
+      "const newsQuery = `(${quotedCompanyNames}) (earnings OR acquisition OR divestiture OR lawsuit OR regulation OR contract OR partnership OR investment OR launch OR order OR award OR \"press release\" OR \"news release\")`;"
+    ].join("\n")
+  );
+  node.parameters.functionCode = node.parameters.functionCode.replace(
+    "    company_domain: companyDomain,",
+    "    company_domain: companyDomain,\n    company_aliases: companyAliases,\n    company_names: companyNames,"
+  );
 });
 
 updateNode("Aggregate Documents for LLM", (node) => {

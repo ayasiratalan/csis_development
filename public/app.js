@@ -127,8 +127,9 @@
     },
     mitsubishi: {
       name: "Mitsubishi",
-      domain: "mitsubishi.com",
-      secCik: ""
+      domain: "mhi.com",
+      secCik: "",
+      aliases: ["Mitsubishi Heavy Industries", "MHI"]
     },
     sumitomo: {
       name: "Sumitomo",
@@ -384,6 +385,7 @@
         company_name: company.name,
         company_domain: company.domain,
         sec_cik: company.secCik,
+        company_aliases: company.aliases || [],
         time_period_days: state.intervalDays,
         time_period_label: state.intervalDays + " days"
       })
