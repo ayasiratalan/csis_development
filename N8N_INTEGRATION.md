@@ -133,6 +133,8 @@ The discovery branches are:
 
 Every company in the dashboard has a profile in `Normalize Inputs` with aliases, official domains, curated sector sources, and sector-specific search terms. For example, energy companies use oil, LNG, upstream, and refining sources; banks use finance and banking sources; pharmaceutical companies use biotech and FDA-oriented sources; aerospace and defense companies use defense and aviation sources; and Japanese/Korean conglomerates include regional business outlets plus relevant sector sources. This is meant to catch company announcements, industry coverage, and broader news instead of relying on one generic company-name search.
 
+The Tavily query field has a 400-character limit, so `Normalize Inputs` uses a `buildLimitedQuery` helper to cap each search query at 360 characters. Exhaustiveness comes from multiple search branches and curated domain packs, not from putting every alias and term into one oversized query.
+
 Those branches flow through:
 
 ```text
