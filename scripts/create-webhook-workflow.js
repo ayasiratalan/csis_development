@@ -140,14 +140,32 @@ function tavilyBody(queryField, options) {
   return `={{ JSON.stringify({\n${lines.join("\n")}\n}) }}`;
 }
 
+function tavilyBodyFromCurrentItem(queryField, domainsField, options) {
+  return `={{ JSON.stringify({
+  query: $json.${queryField},
+  topic: '${options.topic}',
+  search_depth: 'advanced',
+  include_domains: $json.${domainsField},
+  include_raw_content: true,
+  max_results: $json.${options.maxResultsField} || ${options.defaultMaxResults},
+  start_date: $json.start_date,
+  end_date: $json.end_date,
+  include_answer: false
+}) }}`;
+}
+
 function makeFlattenCode(sourceClass, queryField) {
   const source =
     workflow.nodes.find((node) => node.name === "Flatten News Results") ||
     workflow.nodes.find((node) => node.name === "Flatten Broad News Results");
   if (!source) throw new Error("Missing news flatten source node");
-  return source.parameters.functionCode
+  const code = source.parameters.functionCode
     .replace("const sourceClass = 'news';", `const sourceClass = '${sourceClass}';`)
     .replace("const queryField = 'news_query';", `const queryField = '${queryField}';`);
+  if (code.includes("official_domains: item.official_domains")) return code;
+  return code
+    .split("company_domain: item.company_domain || '',")
+    .join("company_domain: item.company_domain || '',\n      official_domains: item.official_domains || [],\n      corporate_news_domains: item.corporate_news_domains || [],");
 }
 
 updateNode("Normalize Inputs", (node) => {
@@ -355,11 +373,113 @@ updateNode("Aggregate Documents for LLM", (node) => {
   );
 });
 
+updateNode("Deduplicate and Tidy Documents", (node) => {
+  node.parameters.functionCode = node.parameters.functionCode.replace(
+    "company_domain: doc.company_domain || '',",
+    "company_domain: doc.company_domain || '',\n      official_domains: doc.official_domains || [],\n      corporate_news_domains: doc.corporate_news_domains || [],"
+  );
+});
+
+updateNode("Validate Dates and Company Match", (node) => {
+  node.parameters.functionCode = node.parameters.functionCode.replace(
+    "    if (companyDomain && domain && domain !== 'sec.gov' && domain !== 'businesswire.com' && domain !== 'prnewswire.com' && domain !== 'globenewswire.com') {\n      if (!(domain === companyDomain || domain.endsWith(`.${companyDomain}`))) reasons.push('non_company_official_domain');\n    }",
+    [
+      "    const docOfficialDomains = Array.isArray(doc.official_domains) ? doc.official_domains : [];",
+      "    const docCorporateNewsDomains = Array.isArray(doc.corporate_news_domains) ? doc.corporate_news_domains : [];",
+      "    const allowedOfficialDomains = [",
+      "      companyDomain,",
+      "      ...docOfficialDomains,",
+      "      ...docCorporateNewsDomains,",
+      "      'sec.gov',",
+      "      'businesswire.com',",
+      "      'prnewswire.com',",
+      "      'globenewswire.com'",
+      "    ]",
+      "      .map(d => (d || '').toString().toLowerCase().replace(/^www\\./, ''))",
+      "      .filter(Boolean);",
+      "    const officialDomainAllowed = allowedOfficialDomains.some(d => domain === d || domain.endsWith(`.${d}`));",
+      "    if (domain && !officialDomainAllowed) reasons.push('non_company_official_domain');"
+    ].join("\n")
+  );
+});
+
 updateNode("Append results to data_base_v1", (node) => {
   const value = node.parameters.columns.value;
   value.row_number = "={{ $('Normalize Inputs').item.json.row_number || '' }}";
   value.requested_at = "={{ $('Normalize Inputs').item.json.requested_at || '' }}";
   value.notes = "={{ $('Normalize Inputs').item.json.notes || '' }}";
+});
+
+updateNode("Select Company Note", (node) => {
+  node.parameters.functionCode = [
+    "const normalized = $('Normalize Inputs').item.json || {};",
+    "const target = ((normalized.company_name || '') + '').trim().toLowerCase();",
+    "const rows = items.map(i => i.json || {});",
+    "const match = rows.find(r => (((r.company_name || r.Company || '') + '').trim().toLowerCase() === target)) || {};",
+    "const getField = (...names) => {",
+    "  for (const name of names) {",
+    "    const value = match[name];",
+    "    if (value !== undefined && value !== null && value.toString().trim()) return value.toString().trim();",
+    "  }",
+    "  return '';",
+    "};",
+    "const dedup = (arr) => [...new Set(arr.filter(Boolean))];",
+    "const normalizeUrl = (raw = '') => {",
+    "  const value = raw.toString().trim().replace(/[),.;]+$/g, '');",
+    "  if (!value) return '';",
+    "  if (/^https?:\\/\\//i.test(value)) return value;",
+    "  if (/^[a-z0-9.-]+\\.[a-z]{2,}(\\/.*)?$/i.test(value)) return `https://${value}`;",
+    "  return '';",
+    "};",
+    "const hostname = (raw = '') => {",
+    "  const url = normalizeUrl(raw);",
+    "  if (!url) return '';",
+    "  try { return new URL(url).hostname.toLowerCase().replace(/^www\\./, ''); } catch (e) { return ''; }",
+    "};",
+    "const corporateNewsRaw = getField('company_news', 'Corporate News', 'Company News', 'corporate_news', 'Corporate_News', 'company news');",
+    "const explicitUrls = corporateNewsRaw.match(/https?:\\/\\/[^\\s,;]+/gi) || [];",
+    "const urlTokens = corporateNewsRaw.split(/[\\s,;\\n]+/);",
+    "const corporateNewsLinks = dedup([...explicitUrls, ...urlTokens].map(normalizeUrl));",
+    "const corporateNewsDomains = dedup([",
+    "  ...corporateNewsLinks.map(hostname),",
+    "  ...((normalized.official_domains || []).filter(Boolean))",
+    "]);",
+    "const note = {",
+    "  company_name: match.company_name || match.Company || normalized.company_name || '',",
+    "  industries: getField('industries', 'What industries are they in'),",
+    "  operating_regions: getField('operating_regions', 'Where do they operate'),",
+    "  sensitivities: getField('other_sensitivities', 'Other sensitivities'),",
+    "  requested_briefings: getField('requested_briefings', 'What have they requested briefings on'),",
+    "  future_interests: getField('future_interests', 'Best Guess for Future Interests'),",
+    "  corporate_news: corporateNewsRaw",
+    "};",
+    "const hasNote = Object.values(note).some(v => (v || '').toString().trim() !== '');",
+    "const bundle = hasNote",
+    "  ? [",
+    "      `Company: ${note.company_name}`,",
+    "      `Industries: ${note.industries}`,",
+    "      `Where they operate: ${note.operating_regions}`,",
+    "      `Other sensitivities: ${note.sensitivities}`,",
+    "      `Requested briefings: ${note.requested_briefings}`,",
+    "      `Best guess for future interests: ${note.future_interests}`,",
+    "      `Corporate newsrooms: ${corporateNewsLinks.join(', ') || corporateNewsRaw || 'None provided'}`",
+    "    ].join('\\n')",
+    "  : 'No past CSIS engagement memo found for this company.';",
+    "return [{",
+    "  json: {",
+    "    ...normalized,",
+    "    company_note_found: hasNote,",
+    "    company_note_struct: note,",
+    "    company_note_bundle: bundle,",
+    "    corporate_news_raw: corporateNewsRaw,",
+    "    corporate_news_links: corporateNewsLinks,",
+    "    corporate_news_domains: corporateNewsDomains,",
+    "    corporate_news_query: normalized.announcement_query,",
+    "    corporate_news_max_results: corporateNewsLinks.length ? 20 : 5",
+    "  },",
+    "  pairedItem: { item: 0 }",
+    "}];"
+  ].join("\n");
 });
 
 updateNode("Search News Sources", (node) => {
@@ -412,6 +532,35 @@ copyNode("Flatten Broad News Results", {
 });
 
 copyNode("Search Broad News Sources", {
+  id: "search-corporate-newsroom-links",
+  name: "Search Corporate Newsroom Links",
+  position: [704, 888],
+  parameters: {
+    ...workflow.nodes.find((node) => node.name === "Search Broad News Sources").parameters,
+    jsonBody: tavilyBodyFromCurrentItem("corporate_news_query", "corporate_news_domains", {
+      topic: "general",
+      maxResultsField: "corporate_news_max_results",
+      defaultMaxResults: 10
+    })
+  }
+});
+
+copyNode("Merge Broad News Meta + Results", {
+  id: "merge-corporate-newsroom-links",
+  name: "Merge Corporate Newsroom Meta + Results",
+  position: [944, 888]
+});
+
+copyNode("Flatten Broad News Results", {
+  id: "flatten-corporate-newsroom-links",
+  name: "Flatten Corporate Newsroom Results",
+  position: [1184, 888],
+  parameters: {
+    functionCode: makeFlattenCode("official", "corporate_news_query")
+  }
+});
+
+copyNode("Search Broad News Sources", {
   id: "search-targeted-news-sites",
   name: "Search Curated News Sites",
   position: [-32, 1144],
@@ -456,6 +605,15 @@ workflow.nodes.push({
   position: [832, 1112],
   id: "append-news-and-announcements",
   name: "Append News + Announcements"
+});
+
+workflow.nodes.push({
+  parameters: {},
+  type: "n8n-nodes-base.merge",
+  typeVersion: 3.2,
+  position: [1072, 1032],
+  id: "append-corporate-newsroom-results",
+  name: "Append Corporate Newsroom Results"
 });
 
 const oldConnections = workflow.connections || {};
@@ -530,6 +688,25 @@ oldConnections["Flatten Company Announcement Results"] = {
   main: [[{ node: "Append News + Announcements", type: "main", index: 1 }]]
 };
 oldConnections["Append News + Announcements"] = {
+  main: [[{ node: "Append Corporate Newsroom Results", type: "main", index: 0 }]]
+};
+oldConnections["Select Company Note"] = {
+  main: [[
+    { node: "Merge Final Packet", type: "main", index: 5 },
+    { node: "Search Corporate Newsroom Links", type: "main", index: 0 },
+    { node: "Merge Corporate Newsroom Meta + Results", type: "main", index: 0 }
+  ]]
+};
+oldConnections["Search Corporate Newsroom Links"] = {
+  main: [[{ node: "Merge Corporate Newsroom Meta + Results", type: "main", index: 1 }]]
+};
+oldConnections["Merge Corporate Newsroom Meta + Results"] = {
+  main: [[{ node: "Flatten Corporate Newsroom Results", type: "main", index: 0 }]]
+};
+oldConnections["Flatten Corporate Newsroom Results"] = {
+  main: [[{ node: "Append Corporate Newsroom Results", type: "main", index: 1 }]]
+};
+oldConnections["Append Corporate Newsroom Results"] = {
   main: [[{ node: "Append + News", type: "main", index: 1 }]]
 };
 

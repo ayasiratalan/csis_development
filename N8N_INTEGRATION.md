@@ -128,6 +128,7 @@ The latest webhook workflow no longer relies on one broad news query. `Normalize
 The discovery branches are:
 
 - `Search Company Website Announcements`: searches official company domains and announcement sites.
+- `Search Corporate Newsroom Links`: reads the `Corporate News` column from `Company_Notes`, extracts newsroom URLs/domains, and searches those official newsroom sources directly.
 - `Search Curated News Sites`: searches company-specific domain packs covering major news, wires, regional sources, and sector outlets.
 - `Search Broad News Sources`: searches broader Tavily news results without domain restriction.
 
@@ -141,10 +142,12 @@ Those branches flow through:
 Flatten Broad News Results
 Flatten Curated News Results
 Flatten Company Announcement Results
+Flatten Corporate Newsroom Results
 -> Append Broad + Curated News
 -> Append News + Announcements
+-> Append Corporate Newsroom Results
 -> Append + News
 -> Validate Dates and Company Match
 ```
 
-This means company website announcements, wire-service items, and broader news are all deduplicated and validated together before the LLM memo stage.
+This means company website announcements, manually supplied corporate newsroom links, wire-service items, and broader news are all deduplicated and validated together before the LLM memo stage. The validator now treats domains from `Corporate News` and `official_domains` as accepted official company domains.
