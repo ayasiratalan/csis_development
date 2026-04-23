@@ -151,3 +151,5 @@ Flatten Corporate Newsroom Results
 ```
 
 This means company website announcements, manually supplied corporate newsroom links, wire-service items, and broader news are all deduplicated and validated together before the LLM memo stage. The validator now treats domains from `Corporate News` and `official_domains` as accepted official company domains.
+
+The final strategist prompt is configured to place inline markdown hyperlink citations at the end of factual sentences in the one-page memo, using URLs from `validated_sources`. The dashboard renderer respects those inline links and falls back to paragraph-level citations only when inline citations are absent.

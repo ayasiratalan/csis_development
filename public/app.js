@@ -445,6 +445,10 @@
     }
   }
 
+  function hasInlineCitations(text) {
+    return /\[[^\]]+\]\((https?:\/\/[^)\s]+)\)/.test(text || "");
+  }
+
   function parseMemoSections(memo) {
     var lines = memo.split(/\r?\n/);
     var sections = [];
@@ -562,7 +566,7 @@
               if (!itemText) return;
               var item = document.createElement("li");
               appendLinkedText(item, itemText);
-              if (paragraphIndex === 0) {
+              if (paragraphIndex === 0 && !hasInlineCitations(itemText)) {
                 appendCitations(item, sectionSources(section.title, sources));
               }
               list.appendChild(item);
@@ -573,7 +577,7 @@
 
           var p = document.createElement("p");
           appendLinkedText(p, trimmed);
-          if (paragraphIndex === 0) {
+          if (paragraphIndex === 0 && !hasInlineCitations(trimmed)) {
             appendCitations(p, sectionSources(section.title, sources));
           }
           sectionEl.appendChild(p);

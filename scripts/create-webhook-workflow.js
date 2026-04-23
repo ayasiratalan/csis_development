@@ -168,6 +168,22 @@ function makeFlattenCode(sourceClass, queryField) {
     .join("company_domain: item.company_domain || '',\n      official_domains: item.official_domains || [],\n      corporate_news_domains: item.corporate_news_domains || [],");
 }
 
+updateNode("LLM 5 (Final Strategist)", (node) => {
+  const systemMessage = (node.parameters.responses.values || []).find(
+    (message) => message.role === "system"
+  );
+  if (!systemMessage) throw new Error("Missing system prompt for final strategist");
+
+  if (!systemMessage.content.includes("inline markdown hyperlink citations")) {
+    systemMessage.content +=
+      "\n- Every factual sentence that relies on source material must end with one or more inline markdown hyperlink citations using URLs from `validated_sources`, for example `[Reuters](https://...)` or `[NVIDIA Newsroom](https://...)`." +
+      "\n- Put citations immediately at the end of the sentence they support, not at the end of the paragraph." +
+      "\n- Prefer the most specific source available for each sentence. Use official company newsroom, filing, or regulatory URLs when they support the claim." +
+      "\n- If a sentence is based only on the company note and not on validated external sources, do not invent a citation for it." +
+      "\n- Do not invent facts, meetings, experts, reports, or citation URLs.";
+  }
+});
+
 updateNode("Normalize Inputs", (node) => {
   node.position = [-480, 768];
   node.parameters.functionCode = node.parameters.functionCode.replace(
