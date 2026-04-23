@@ -209,6 +209,11 @@
     return "Confidence " + Math.round(value * 100) + "%";
   }
 
+  function currentMainWebsite() {
+    var company = companyData[state.companyKey] || {};
+    return company.domain || "";
+  }
+
   function isoDateOffset(daysAgo) {
     var date = new Date();
     date.setUTCDate(date.getUTCDate() - daysAgo);
@@ -632,10 +637,10 @@
 
       var meta = document.createElement("div");
       meta.className = "source-meta";
+      var mainWebsite = source.domain || currentMainWebsite();
       meta.textContent = [
-        source.domain || "Unknown domain",
-        source.publishedDate || "Unknown publication date",
-        formatConfidence(source.entityConfidence)
+        "Main website: " + mainWebsite,
+        source.publishedDate ? "Published: " + source.publishedDate : ""
       ]
         .filter(Boolean)
         .join(" | ");
@@ -653,9 +658,7 @@
       "Run ID: " +
       (result.runId || "n/a") +
       "<br />Generated: " +
-      formatDate(result.generatedAt) +
-      "<br />Mode: " +
-      result.mode;
+      formatDate(result.generatedAt);
     fileChip.textContent = result.excelFileName
       ? "Validated file: " + result.excelFileName
       : "Validated sources displayed below";
@@ -664,21 +667,17 @@
   }
 
   async function loadHealth() {
+    modeChip.hidden = true;
+
     if (hasDirectN8nWebhook()) {
       state.workflowMode = "direct n8n webhook";
-      modeChip.textContent = "Workflow Mode: Direct n8n webhook";
-      setStatus(
-        "Direct n8n mode is active. Clicking Run Workflow will POST to the webhook in config.js."
-      );
+      setStatus("Ready to generate a memo.");
       return;
     }
 
     if (state.isFilePreview) {
       state.workflowMode = "file preview";
-      modeChip.textContent = "Workflow Mode: File preview";
-      setStatus(
-        "File preview is active. It does not run n8n. Add a webhook URL in public/config.js or run `node server.js` for live mode."
-      );
+      setStatus("Preview is available. Add a webhook URL in public/config.js for live runs.");
       return;
     }
 
@@ -687,18 +686,13 @@
       var payload = await response.json();
       state.workflowMode = payload.workflowMode || "unknown";
       if (state.workflowMode === "webhook" && !payload.n8nConfigured) {
-        modeChip.textContent = "Workflow Mode: Webhook not configured";
         setStatus(
           "Backend is in webhook mode, but N8N_WEBHOOK_URL is missing. Add it to .env and restart the server."
         );
       } else {
-        modeChip.textContent =
-          state.workflowMode === "mock"
-            ? "Workflow Mode: Mock preview"
-            : "Workflow Mode: Live webhook";
+        setStatus("Ready to generate a memo.");
       }
     } catch (error) {
-      modeChip.textContent = "Workflow mode unavailable";
       setStatus(
         "Backend unavailable. Run `node server.js` and open http://127.0.0.1:3000, or open this file directly for preview mode."
       );
