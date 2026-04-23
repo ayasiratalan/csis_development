@@ -120,7 +120,9 @@ The latest webhook workflow no longer relies on one broad news query. `Normalize
 
 - `company_names`: the submitted company plus aliases such as `Mitsubishi Heavy Industries` and `MHI`
 - `official_domains`: company websites, press rooms, investor sites, wire services, and SEC where relevant
+- `security_domains`: curated military, defense, alliance, and strategic-security domains
 - `news_domains`: curated media, wire-service, regional, and sector-specific domains
+- `security_query`: for defense, military, conflict-trajectory, and geopolitical-security searches
 - `announcement_query`: for company website announcements and press releases
 - `targeted_news_query`: for curated news-domain searches
 - `news_query`: for broad news search
@@ -129,6 +131,7 @@ The discovery branches are:
 
 - `Search Company Website Announcements`: searches official company domains and announcement sites.
 - `Search Corporate Newsroom Links`: reads the `Corporate News` column from `Company_Notes`, extracts newsroom URLs/domains, and searches those official newsroom sources directly.
+- `Search Security / Defense Sources`: searches security, defense, alliance, and military-analysis outlets relevant to the company and its sector.
 - `Search Curated News Sites`: searches company-specific domain packs covering major news, wires, regional sources, and sector outlets.
 - `Search Broad News Sources`: searches broader Tavily news results without domain restriction.
 
@@ -143,13 +146,17 @@ Flatten Broad News Results
 Flatten Curated News Results
 Flatten Company Announcement Results
 Flatten Corporate Newsroom Results
+Flatten Security Results
 -> Append Broad + Curated News
 -> Append News + Announcements
 -> Append Corporate Newsroom Results
+-> Append + Security
 -> Append + News
 -> Validate Dates and Company Match
 ```
 
-This means company website announcements, manually supplied corporate newsroom links, wire-service items, and broader news are all deduplicated and validated together before the LLM memo stage. The validator now treats domains from `Corporate News` and `official_domains` as accepted official company domains.
+This means company website announcements, manually supplied corporate newsroom links, security/defense analysis, wire-service items, and broader news are all deduplicated and validated together before the LLM memo stage. The validator now treats domains from `Corporate News` and `official_domains` as accepted official company domains.
 
 The final strategist prompt is configured to place inline markdown hyperlink citations at the end of factual sentences in the one-page memo, using URLs from `validated_sources`. The dashboard renderer respects those inline links and falls back to paragraph-level citations only when inline citations are absent.
+
+The workflow now also includes a dedicated security extractor and final-strategist instructions that explicitly require military, defense, deterrence, force-posture, alliance, escalation, maritime, cyber, and defense-industrial-base perspectives when they are relevant to the company. This is meant to widen the CSIS fit beyond economics, trade, and commercial policy.

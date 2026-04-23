@@ -154,18 +154,24 @@ function tavilyBodyFromCurrentItem(queryField, domainsField, options) {
 }) }}`;
 }
 
-function makeFlattenCode(sourceClass, queryField) {
-  const source =
-    workflow.nodes.find((node) => node.name === "Flatten News Results") ||
-    workflow.nodes.find((node) => node.name === "Flatten Broad News Results");
+function makeFlattenCodeFromNode(sourceNodeName, sourceClass, queryField) {
+  const source = workflow.nodes.find((node) => node.name === sourceNodeName);
   if (!source) throw new Error("Missing news flatten source node");
   const code = source.parameters.functionCode
-    .replace("const sourceClass = 'news';", `const sourceClass = '${sourceClass}';`)
-    .replace("const queryField = 'news_query';", `const queryField = '${queryField}';`);
+    .replace(/const sourceClass = '([^']+)';/, `const sourceClass = '${sourceClass}';`)
+    .replace(/const queryField = '([^']+)';/, `const queryField = '${queryField}';`);
   if (code.includes("official_domains: item.official_domains")) return code;
   return code
     .split("company_domain: item.company_domain || '',")
     .join("company_domain: item.company_domain || '',\n      official_domains: item.official_domains || [],\n      corporate_news_domains: item.corporate_news_domains || [],");
+}
+
+function makeFlattenCode(sourceClass, queryField) {
+  const sourceName =
+    workflow.nodes.find((node) => node.name === "Flatten Broad News Results")
+      ? "Flatten Broad News Results"
+      : "Flatten News Results";
+  return makeFlattenCodeFromNode(sourceName, sourceClass, queryField);
 }
 
 updateNode("LLM 5 (Final Strategist)", (node) => {
@@ -181,6 +187,12 @@ updateNode("LLM 5 (Final Strategist)", (node) => {
       "\n- Prefer the most specific source available for each sentence. Use official company newsroom, filing, or regulatory URLs when they support the claim." +
       "\n- If a sentence is based only on the company note and not on validated external sources, do not invent a citation for it." +
       "\n- Do not invent facts, meetings, experts, reports, or citation URLs.";
+  }
+  if (!systemMessage.content.includes("military or defense perspective")) {
+    systemMessage.content +=
+      "\n- When the company is exposed to war, alliance politics, deterrence dynamics, force posture, defense-industrial-base issues, export controls, cyber conflict, maritime disruption, or regional escalation, include that military or defense perspective explicitly rather than reducing the analysis to economics or trade." +
+      "\n- In `csis_convergence_paragraph`, explain not only economic or policy relevance but also what security, military, defense, regional-conflict, or deterrence questions CSIS could analyze for the company when relevant." +
+      "\n- Use the structured `security_analysis` input to surface plausible conflict trajectories, force-posture implications, and defense-relevant questions for CSIS experts.";
   }
 });
 
@@ -261,8 +273,15 @@ updateNode("Normalize Inputs", (node) => {
 	      "  'koreatimes.co.kr', 'koreajoongangdaily.joins.com', 'scmp.com', 'straitstimes.com',",
 	      "  'channelnewsasia.com', 'koreabizwire.com'",
 	      "];",
+	      "const securityDefenseDomains = [",
+	      "  'warontherocks.com', 'defenseone.com', 'breakingdefense.com', 'defensenews.com',",
+	      "  'thecipherbrief.com', 'iiss.org', 'sipri.org', 'rusi.org', 'lawfaremedia.org',",
+	      "  'jamestown.org', 'fpri.org', 'cna.org', 'atlanticcouncil.org', 'stimson.org',",
+	      "  'maritime-executive.com', 'navalnews.com', 'airandspaceforces.com', 'csis.org'",
+	      "];",
 	      "const domainPack = (...groups) => dedup([...globalNewsDomains, ...groups.flat()]);",
 	      "const commonNewsTerms = ['earnings', 'acquisition', 'divestiture', 'lawsuit', 'regulation', 'contract', 'partnership', 'investment', 'launch', 'order', 'award', 'geopolitical', 'supply chain', 'policy', 'tariff', 'sanctions', 'export controls'];",
+	      "const commonSecurityTerms = ['geopolitical risk', 'armed conflict', 'military', 'defense', 'deterrence', 'force posture', 'alliance', 'sanctions', 'export controls', 'maritime security', 'cybersecurity', 'space security'];",
 	      "const companyProfiles = {",
 	      "  adm: { domain: 'adm.com', aliases: ['Archer Daniels Midland', 'ADM Company', 'Archer-Daniels-Midland'], official_domains: ['adm.com'], news_domains: domainPack(agricultureFoodNewsDomains), news_terms: ['grain', 'soybean', 'corn', 'biofuels', 'ethanol', 'agriculture', 'food ingredients'] },",
 	      "  bhp: { domain: 'bhp.com', aliases: ['BHP Group', 'Broken Hill Proprietary'], official_domains: ['bhp.com'], news_domains: domainPack(miningMetalsNewsDomains, asiaBusinessNewsDomains), news_terms: ['mining', 'copper', 'iron ore', 'potash', 'coal', 'critical minerals', 'nickel'] },",
@@ -334,12 +353,18 @@ updateNode("Normalize Inputs", (node) => {
     "const officialDomainsFinal = dedup(officialDomains);"
   );
   node.parameters.functionCode = node.parameters.functionCode.replace(
+    "const thinktankDomains = ['csis.org', 'brookings.edu', 'rand.org', 'cfr.org', 'cnas.org', 'carnegieendowment.org', 'aei.org'];",
+    "const thinktankDomains = ['csis.org', 'brookings.edu', 'rand.org', 'cfr.org', 'cnas.org', 'carnegieendowment.org', 'aei.org'];\nconst securityDomains = dedup([...securityDefenseDomains, 'csis.org', 'cnas.org', 'rand.org', 'cfr.org']);"
+  );
+  node.parameters.functionCode = node.parameters.functionCode.replace(
     "const officialQuery = paddedCik\n  ? `\"${company}\" ${shortCik} (\"8-K\" OR \"10-Q\" OR \"10-K\" OR \"earnings release\" OR \"investor relations\" OR \"press release\")`\n  : `\"${company}\" (\"8-K\" OR \"10-Q\" OR \"10-K\" OR \"earnings release\" OR \"investor relations\" OR \"press release\")`;\nconst governmentQuery = `\"${company}\" (\"LD-2\" OR lobbying OR procurement OR \"Senate lobbying\" OR \"Federal Register\")`;\nconst thinktankQuery = `\"${company}\" (regulation OR policy OR analysis OR briefing OR strategic risk)`;\nconst newsQuery = `\"${company}\" (earnings OR acquisition OR divestiture OR lawsuit OR regulation OR contract)`;",
     [
 	      "const filingTerms = ['8-K', '10-Q', '10-K', 'earnings release', 'investor relations', 'press release', 'news release', 'contract', 'award'];",
 	      "const officialQuery = buildLimitedQuery(queryCompanyNames, paddedCik ? [shortCik, ...filingTerms] : filingTerms);",
 	      "const governmentQuery = buildLimitedQuery(queryCompanyNames, ['LD-2', 'lobbying', 'procurement', 'Senate lobbying', 'Federal Register']);",
 	      "const thinktankQuery = buildLimitedQuery(queryCompanyNames, ['regulation', 'policy', 'analysis', 'briefing', 'strategic risk']);",
+	      "const securityQueryTerms = dedup([...commonSecurityTerms, ...(profile.security_terms || []), ...(profile.news_terms || [])]);",
+	      "const securityQuery = buildLimitedQuery(queryCompanyNames, securityQueryTerms);",
 	      "const announcementTerms = ['announcement', 'press release', 'news release', 'contract', 'award', 'order', 'partnership', 'investment', 'launch', 'acquisition', 'divestiture', 'lawsuit', 'earnings'];",
 	      "const queryTerms = dedup([...commonNewsTerms, ...(profile.news_terms || [])]);",
 	      "const announcementQueryTerms = dedup([...announcementTerms, ...(profile.news_terms || [])]);",
@@ -355,15 +380,19 @@ updateNode("Normalize Inputs", (node) => {
   );
   node.parameters.functionCode = node.parameters.functionCode.replace(
     "    thinktank_domains: thinktankDomains,",
-    "    thinktank_domains: thinktankDomains,\n    news_domains: newsDomains,"
+    "    thinktank_domains: thinktankDomains,\n    security_domains: securityDomains,\n    news_domains: newsDomains,"
   );
   node.parameters.functionCode = node.parameters.functionCode.replace(
     "    news_query: newsQuery,",
-    "    announcement_query: announcementQuery,\n    targeted_news_query: targetedNewsQuery,\n    news_query: newsQuery,"
+    "    security_query: securityQuery,\n    announcement_query: announcementQuery,\n    targeted_news_query: targetedNewsQuery,\n    news_query: newsQuery,"
   );
 });
 
 updateNode("Aggregate Documents for LLM", (node) => {
+  node.parameters.functionCode = node.parameters.functionCode.replace(
+    "const bySource = { official: [], government: [], thinktank: [], news: [] };",
+    "const bySource = { official: [], government: [], thinktank: [], security: [], news: [] };"
+  );
   node.parameters.functionCode = node.parameters.functionCode.replace(
     "const counts = {",
     [
@@ -386,6 +415,14 @@ updateNode("Aggregate Documents for LLM", (node) => {
   node.parameters.functionCode = node.parameters.functionCode.replace(
     "doc_stats: counts,",
     "doc_stats: counts,\n    validated_sources: validatedSources,"
+  );
+  node.parameters.functionCode = node.parameters.functionCode.replace(
+    "  thinktank: bySource.thinktank.length,\n  news: bySource.news.length,",
+    "  thinktank: bySource.thinktank.length,\n  security: bySource.security.length,\n  news: bySource.news.length,"
+  );
+  node.parameters.functionCode = node.parameters.functionCode.replace(
+    "    thinktank_bundle: pack(bySource.thinktank),\n    news_bundle: pack(bySource.news)",
+    "    thinktank_bundle: pack(bySource.thinktank),\n    security_bundle: pack(bySource.security),\n    news_bundle: pack(bySource.news)"
   );
 });
 
@@ -443,6 +480,82 @@ updateNode("Convert Documents to Excel", (node) => {
       "={{ $(\"Normalize Inputs\").first().json.company_name }}_validated_documents_{{ $now.toFormat(\"yyyy-MM-dd\") }}.xlsx";
   }
   node.parameters.options.sheetName = "Validated Documents";
+});
+
+updateNode("Merge Final Packet", (node) => {
+  node.parameters.numberInputs = 8;
+});
+
+copyNode("Search Think Tank / Policy Sources", {
+  id: "search-security-defense-sources",
+  name: "Search Security / Defense Sources",
+  position: [-32, 1384],
+  parameters: {
+    ...workflow.nodes.find((node) => node.name === "Search Think Tank / Policy Sources").parameters,
+    jsonBody: tavilyBody("security_query", {
+      topic: "general",
+      includeDomainsField: "security_domains",
+      maxResults: 10
+    })
+  }
+});
+
+copyNode("Merge Think Tank Meta + Results", {
+  id: "merge-security-defense-meta-results",
+  name: "Merge Security Meta + Results",
+  position: [208, 1384]
+});
+
+copyNode("Flatten Think Tank Results", {
+  id: "flatten-security-defense-results",
+  name: "Flatten Security Results",
+  position: [448, 1384],
+  parameters: {
+    functionCode: makeFlattenCodeFromNode("Flatten Think Tank Results", "security", "security_query")
+  }
+});
+
+updateNode("Flatten Security Results", (node) => {
+  node.parameters.functionCode = node.parameters.functionCode
+    .replace("const sourceClass = 'thinktank';", "const sourceClass = 'security';")
+    .replace("const queryField = 'thinktank_query';", "const queryField = 'security_query';");
+});
+
+workflow.nodes.push({
+  parameters: {},
+  type: "n8n-nodes-base.merge",
+  typeVersion: 3.2,
+  position: [704, 968],
+  id: "append-security-analysis-sources",
+  name: "Append + Security"
+});
+
+copyNode("LLM 3 - Think Tank Extractor", {
+  id: "llm-security-defense-extractor",
+  name: "LLM 3B - Security / Defense Extractor",
+  parameters: {
+    ...workflow.nodes.find((node) => node.name === "LLM 3 - Think Tank Extractor").parameters,
+    responses: {
+      values: [
+        {
+          role: "system",
+          content:
+            "You are a deterministic security, defense, and geopolitical risk extraction algorithm. Analyze the provided military, defense, alliance, and strategic-security materials. Extract conflict trajectories, force posture implications, defense-industrial-base issues, alliance dynamics, sanctions or export-control risks, and specific security questions relevant to the company. Do not add commentary.\n\nReturn only valid JSON with this schema:\n{\n  \"security_landscape_baseline\": \"string\",\n  \"conflict_and_escalation_risks\": [\"string\"],\n  \"military_and_force_posture_implications\": [\"string\"],\n  \"defense_industrial_and_national_security_relevance\": [\"string\"],\n  \"security_questions_csis_could_answer\": [\"string\"]\n}"
+        },
+        {
+          content: "={{ $json.security_bundle }}"
+        }
+      ]
+    }
+  }
+});
+
+copyNode("Parse Think Tank Extractor Output", {
+  id: "parse-security-defense-extractor-output",
+  name: "Parse Security Extractor Output",
+  parameters: {
+    functionCode: "\nconst parsed = items[0].json.output?.[0]?.content?.[0]?.text || {};\nreturn [{ json: { security_analysis: parsed } }];\n"
+  }
 });
 
 updateNode("Select Company Note", (node) => {
@@ -681,6 +794,8 @@ oldConnections["Normalize Inputs"] = {
     { node: "Merge Government Meta + Results", type: "main", index: 0 },
     { node: "Search Think Tank / Policy Sources", type: "main", index: 0 },
     { node: "Merge Think Tank Meta + Results", type: "main", index: 0 },
+    { node: "Search Security / Defense Sources", type: "main", index: 0 },
+    { node: "Merge Security Meta + Results", type: "main", index: 0 },
     { node: "Search Company Website Announcements", type: "main", index: 0 },
     { node: "Merge Company Announcement Meta + Results", type: "main", index: 0 },
     { node: "Search Curated News Sites", type: "main", index: 0 },
@@ -695,8 +810,14 @@ oldConnections["Normalize Inputs"] = {
 oldConnections["Search Company Website Announcements"] = {
   main: [[{ node: "Merge Company Announcement Meta + Results", type: "main", index: 1 }]]
 };
+oldConnections["Search Security / Defense Sources"] = {
+  main: [[{ node: "Merge Security Meta + Results", type: "main", index: 1 }]]
+};
 oldConnections["Merge Company Announcement Meta + Results"] = {
   main: [[{ node: "Flatten Company Announcement Results", type: "main", index: 0 }]]
+};
+oldConnections["Merge Security Meta + Results"] = {
+  main: [[{ node: "Flatten Security Results", type: "main", index: 0 }]]
 };
 oldConnections["Search Curated News Sites"] = {
   main: [[{ node: "Merge Curated News Meta + Results", type: "main", index: 1 }]]
@@ -715,6 +836,9 @@ oldConnections["Flatten Broad News Results"] = {
 };
 oldConnections["Flatten Curated News Results"] = {
   main: [[{ node: "Append Broad + Curated News", type: "main", index: 1 }]]
+};
+oldConnections["Flatten Security Results"] = {
+  main: [[{ node: "Append + Security", type: "main", index: 1 }]]
 };
 oldConnections["Append Broad + Curated News"] = {
   main: [[{ node: "Append News + Announcements", type: "main", index: 0 }]]
@@ -744,6 +868,12 @@ oldConnections["Flatten Corporate Newsroom Results"] = {
 oldConnections["Append Corporate Newsroom Results"] = {
   main: [[{ node: "Append + News", type: "main", index: 1 }]]
 };
+oldConnections["Append + Think Tank"] = {
+  main: [[{ node: "Append + Security", type: "main", index: 0 }]]
+};
+oldConnections["Append + Security"] = {
+  main: [[{ node: "Append + News", type: "main", index: 0 }]]
+};
 
 oldConnections["Parse Final Strategist Output"] = {
   main: [
@@ -756,6 +886,36 @@ oldConnections["Parse Final Strategist Output"] = {
 
 oldConnections["Append results to data_base_v1"] = {
   main: [[]]
+};
+
+oldConnections["Aggregate Documents for LLM"] = {
+  main: [[
+    { node: "LLM 1 - Official / Financial Extractor", type: "main", index: 0 },
+    { node: "LLM 2 - Government Extractor", type: "main", index: 0 },
+    { node: "LLM 3 - Think Tank Extractor", type: "main", index: 0 },
+    { node: "LLM 3B - Security / Defense Extractor", type: "main", index: 0 },
+    { node: "LLM 4 - News Extractor", type: "main", index: 0 },
+    { node: "Merge Final Packet", type: "main", index: 5 }
+  ]]
+};
+oldConnections["LLM 3B - Security / Defense Extractor"] = {
+  main: [[{ node: "Parse Security Extractor Output", type: "main", index: 0 }]]
+};
+oldConnections["Parse Security Extractor Output"] = {
+  main: [[{ node: "Merge Final Packet", type: "main", index: 3 }]]
+};
+oldConnections["Parse News Extractor Output"] = {
+  main: [[{ node: "Merge Final Packet", type: "main", index: 4 }]]
+};
+oldConnections["Select Company Note"] = {
+  main: [[
+    { node: "Merge Final Packet", type: "main", index: 6 },
+    { node: "Search Corporate Newsroom Links", type: "main", index: 0 },
+    { node: "Merge Corporate Newsroom Meta + Results", type: "main", index: 0 }
+  ]]
+};
+oldConnections["Aggregate CSIS Experts"] = {
+  main: [[{ node: "Merge Final Packet", type: "main", index: 7 }]]
 };
 
 oldConnections["Prepare Webhook Response"] = {
