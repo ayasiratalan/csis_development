@@ -7,6 +7,8 @@
 3. Expose an n8n webhook for the actual workflow execution.
 4. Return the memo and validated sources directly from n8n as JSON.
 
+Do not treat GitHub Pages direct webhook mode as the production architecture if you want to eliminate browser-side `fetch failed`, CORS, privacy-shield, or cross-network errors. Use the Node backend as a proxy to n8n.
+
 The current n8n export is not ready for real-time dashboard execution because it starts with a manual trigger and writes final results to Google Sheets and Google Drive. The clean production fix is to add a webhook trigger and a webhook response path.
 
 ## Ubuntu server example

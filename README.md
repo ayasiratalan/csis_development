@@ -90,7 +90,7 @@ Then open [http://localhost:3000](http://localhost:3000).
 
 This repository includes a GitHub Actions workflow at `.github/workflows/pages.yml`.
 
-When pushed to GitHub, the workflow deploys the `public/` folder as a static GitHub Pages site. The deployed dashboard calls the production n8n webhook configured in `public/config.js`.
+When pushed to GitHub, the workflow deploys the `public/` folder as a static GitHub Pages site. That static deployment can call the production n8n webhook configured in `public/config.js`, but this is still direct browser-to-n8n mode and can fail on some computers or networks because of browser/CORS/privacy restrictions.
 
 Expected GitHub Pages URL:
 
@@ -126,6 +126,8 @@ node server.js
 ```
 
 Open [http://127.0.0.1:3000](http://127.0.0.1:3000). The chip should say `Workflow Mode: Live webhook`. If it says `Mock preview` or `Webhook not configured`, it is not connected to n8n.
+
+This is the recommended production setup if you want to avoid intermittent browser-side webhook errors. The browser talks only to your own backend, and the backend calls n8n server-to-server.
 
 ## Environment variables
 

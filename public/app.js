@@ -4,6 +4,7 @@
     intervalDays: 14,
     loading: false,
     workflowMode: "unknown",
+    backendAvailable: false,
     isFilePreview: window.location.protocol === "file:"
   };
 
@@ -415,6 +416,16 @@
     return Boolean(runtimeConfig.n8nWebhookUrl && runtimeConfig.n8nWebhookUrl.trim());
   }
 
+  function canUseBackendApi() {
+    return !state.isFilePreview && state.backendAvailable;
+  }
+
+  function delay(ms) {
+    return new Promise(function (resolve) {
+      window.setTimeout(resolve, ms);
+    });
+  }
+
   function normalizeWebhookPayload(payload) {
     if (Array.isArray(payload)) {
       payload = payload[0] || {};
@@ -482,24 +493,35 @@
       headers[runtimeConfig.n8nAuthHeader] = runtimeConfig.n8nAuthValue;
     }
 
+    var payloadBody = JSON.stringify({
+      company_name: company.name,
+      company_domain: company.domain,
+      sec_cik: company.secCik,
+      company_aliases: company.aliases || [],
+      time_period_days: state.intervalDays,
+      time_period_label: state.intervalDays + " days"
+    });
     var response;
-    try {
-      response = await fetch(runtimeConfig.n8nWebhookUrl.trim(), {
-        method: "POST",
-        headers: headers,
-        body: JSON.stringify({
-          company_name: company.name,
-          company_domain: company.domain,
-          sec_cik: company.secCik,
-          company_aliases: company.aliases || [],
-          time_period_days: state.intervalDays,
-          time_period_label: state.intervalDays + " days"
-        })
-      });
-    } catch (error) {
-      throw new Error(
-        "Browser could not reach the n8n webhook. This is usually a CORS restriction, browser privacy/ad-blocking setting, VPN/firewall issue, or a stale config.js on this computer."
-      );
+    var attempts = 2;
+    var attempt;
+
+    for (attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        response = await fetch(runtimeConfig.n8nWebhookUrl.trim(), {
+          method: "POST",
+          headers: headers,
+          body: payloadBody
+        });
+        break;
+      } catch (error) {
+        if (attempt >= attempts) {
+          throw new Error(
+            "The browser did not receive the workflow response. The n8n run may still have started successfully. To eliminate this class of browser/network error, use the dashboard through its backend proxy instead of direct browser-to-n8n mode."
+          );
+        }
+        setStatus("Connection dropped. Retrying the workflow request once...");
+        await delay(1400);
+      }
     }
 
     var payload;
@@ -799,13 +821,13 @@
   async function loadHealth() {
     modeChip.hidden = true;
 
-    if (hasDirectN8nWebhook()) {
-      state.workflowMode = "direct n8n webhook";
-      setStatus("Ready to generate a memo.");
-      return;
-    }
-
     if (state.isFilePreview) {
+      state.backendAvailable = false;
+      if (hasDirectN8nWebhook()) {
+        state.workflowMode = "direct n8n webhook";
+        setStatus("Ready to generate a memo.");
+        return;
+      }
       state.workflowMode = "file preview";
       setStatus("Preview is available. Add a webhook URL in public/config.js for live runs.");
       return;
@@ -814,6 +836,7 @@
     try {
       var response = await fetch("/api/health");
       var payload = await response.json();
+      state.backendAvailable = true;
       state.workflowMode = payload.workflowMode || "unknown";
       if (state.workflowMode === "webhook" && !payload.n8nConfigured) {
         setStatus(
@@ -823,6 +846,12 @@
         setStatus("Ready to generate a memo.");
       }
     } catch (error) {
+      state.backendAvailable = false;
+      if (hasDirectN8nWebhook()) {
+        state.workflowMode = "direct n8n webhook";
+        setStatus("Ready to generate a memo.");
+        return;
+      }
       setStatus(
         "Backend unavailable. Run `node server.js` and open http://127.0.0.1:3000, or open this file directly for preview mode."
       );
@@ -830,6 +859,26 @@
   }
 
   async function runReport() {
+    if (canUseBackendApi()) {
+      var response = await fetch("/api/run-report", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          companyKey: state.companyKey,
+          intervalDays: state.intervalDays
+        })
+      });
+
+      var payload = await response.json();
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || "Unable to complete workflow run.");
+      }
+
+      return payload;
+    }
+
     if (hasDirectN8nWebhook()) {
       return runDirectN8nWebhook();
     }
@@ -838,23 +887,9 @@
       return buildPreviewResult(state.companyKey, state.intervalDays);
     }
 
-    var response = await fetch("/api/run-report", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        companyKey: state.companyKey,
-        intervalDays: state.intervalDays
-      })
-    });
-
-    var payload = await response.json();
-    if (!response.ok || !payload.ok) {
-      throw new Error(payload.error || "Unable to complete workflow run.");
-    }
-
-    return payload;
+    throw new Error(
+      "No live workflow route is configured. Start the backend proxy or set an n8n webhook URL in public/config.js."
+    );
   }
 
   companyOptions.addEventListener("click", function (event) {
