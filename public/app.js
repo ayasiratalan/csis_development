@@ -162,16 +162,22 @@
   var sourcesList = document.getElementById("sources-list");
   var fileChip = document.getElementById("file-chip");
   var progressTimer = null;
+  var allowedIntervals = [14, 30, 60];
+
+  function sliderPositionFromDays(days) {
+    var index = allowedIntervals.indexOf(days);
+    return index === -1 ? 0 : index;
+  }
 
   function sliderPercent() {
-    var min = Number(daySlider.min || 14);
-    var max = Number(daySlider.max || 60);
-    return ((state.intervalDays - min) / (max - min)) * 100;
+    var min = Number(daySlider.min || 0);
+    var max = Number(daySlider.max || (allowedIntervals.length - 1));
+    return ((sliderPositionFromDays(state.intervalDays) - min) / (max - min)) * 100;
   }
 
   function renderDaySelector() {
     if (!daySlider || !dayValue) return;
-    daySlider.value = String(state.intervalDays);
+    daySlider.value = String(sliderPositionFromDays(state.intervalDays));
     dayValue.textContent = state.intervalDays + " days";
     daySlider.style.background =
       "linear-gradient(90deg, rgba(215, 181, 109, 0.88) 0%, rgba(215, 181, 109, 0.88) " +
@@ -860,7 +866,7 @@
 
   daySlider.addEventListener("input", function (event) {
     if (state.loading) return;
-    state.intervalDays = Number(event.target.value);
+    state.intervalDays = allowedIntervals[Number(event.target.value)] || allowedIntervals[0];
     renderDaySelector();
   });
 

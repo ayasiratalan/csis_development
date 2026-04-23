@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CSIS Corporate Memo Dashboard</title>
+    <title>CSIS Corporate Intelligence Analysis</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -13,7 +13,7 @@
 
       <header class="hero">
         <div class="eyebrow">Center for Strategic &amp; International Studies</div>
-        <h1>Corporate Memo Dashboard</h1>
+        <h1>CSIS Corporate Intelligence Analysis</h1>
         <p class="hero-copy">
           Launch a company intelligence run, generate a one-page memo, and review
           the validated source set in one screen.
@@ -43,16 +43,21 @@
               <input
                 type="range"
                 id="day-slider"
-                min="14"
-                max="60"
+                min="0"
+                max="2"
                 step="1"
-                value="14"
+                value="0"
                 list="day-marks"
               />
+              <div class="range-ticks" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
               <datalist id="day-marks">
-                <option value="14" label="14"></option>
-                <option value="30" label="30"></option>
-                <option value="60" label="60"></option>
+                <option value="0" label="14"></option>
+                <option value="1" label="30"></option>
+                <option value="2" label="60"></option>
               </datalist>
               <div class="range-scale" aria-hidden="true">
                 <span>14</span>

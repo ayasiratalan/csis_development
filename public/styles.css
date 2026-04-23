@@ -243,10 +243,38 @@ html {
 
 .range-scale {
   display: flex;
-  justify-content: space-between;
   margin-top: 12px;
   color: var(--text-soft);
   font-size: 0.86rem;
+}
+
+.range-scale span,
+.range-ticks span {
+  flex: 1;
+}
+
+.range-scale span:nth-child(2),
+.range-ticks span:nth-child(2) {
+  text-align: center;
+}
+
+.range-scale span:last-child,
+.range-ticks span:last-child {
+  text-align: right;
+}
+
+.range-ticks {
+  display: flex;
+  margin-top: 10px;
+}
+
+.range-ticks span::before {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.4);
 }
 
 .company-scroll {
